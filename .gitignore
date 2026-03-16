@@ -1,0 +1,12 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# env and secrets
+.env
+.env.*
+firebase-to-blockchain/firebaseKey.json
+
+# build output
+dist/
+build/
