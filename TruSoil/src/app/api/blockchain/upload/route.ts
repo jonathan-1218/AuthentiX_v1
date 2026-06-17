@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
-import { uploadToBlockchain } from "@/lib/blockchain";
-import { buildMerkleRoot } from "@/lib/merkle";
+import { storeMonthlyRootOnChain } from "@/lib/blockchain";
+import { buildMonthlyMerkleRoot } from "@/lib/merkle";
 import { ok, err } from "@/lib/api-response";
-import SensorData from "@/models/SensorData";
-import Batch from "@/models/Batch";
+import DailyMerkleRoot from "@/models/DailyMerkleRoot";
 
-const schema = z.object({ batchId: z.string().min(1) });
+const schema = z.object({
+  monthKey: z.string().regex(/^\d{4}-\d{2}$/, "monthKey must be YYYY-MM"),
+});
 
 export async function POST(req: NextRequest) {
   const role = req.headers.get("x-user-role")!;
@@ -19,35 +20,39 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err(parsed.error.errors[0].message, 400);
 
+  const { monthKey } = parsed.data;
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+
   await connectDB();
 
-  const batch = await Batch.findOne({ batchId: parsed.data.batchId });
-  if (!batch) return err("Batch not found", 404);
+  const dailyRoots = await DailyMerkleRoot.find({
+    date: { $gte: `${monthKey}-01`, $lte: `${monthKey}-31` },
+  }).sort({ date: 1 });
 
-  const readings = await SensorData.find({ batchId: parsed.data.batchId }).sort({ timestamp: 1 }).lean();
-  if (readings.length === 0) return err("No sensor data for this batch", 400);
+  if (dailyRoots.length === 0) return err("No daily roots found for this month", 400);
 
-  const merkleRoot = buildMerkleRoot(
-    readings.map((r) => ({
-      farmId: r.farmId,
-      batchId: r.batchId,
-      timestamp: new Date(r.timestamp).toISOString(),
-      temperature: r.temperature,
-      humidity: r.humidity,
-      soilMoisture: r.soilMoisture,
-      pH: r.pH,
-      pesticide: r.pesticide,
-      rain: r.rain,
-    }))
-  );
+  const merkleRootArray = dailyRoots.map((r) => r.merkleRoot);
+  const monthlyMerkleRoot = buildMonthlyMerkleRoot(merkleRootArray);
+  const farmCount = new Set(dailyRoots.map((r) => r.farmId)).size;
 
-  const result = await uploadToBlockchain({
-    farmId: batch.farmId,
-    batchId: batch.batchId,
-    merkleRoot,
-    complianceScore: batch.overallScore,
-    grade: batch.overallGrade,
+  const result = await storeMonthlyRootOnChain({
+    monthKey,
+    merkleRoot: monthlyMerkleRoot,
+    year,
+    month,
+    farmCount,
+    dailyRootCount: dailyRoots.length,
   });
 
-  return ok(result);
+  return ok({
+    monthKey,
+    merkleRoot: monthlyMerkleRoot,
+    transactionHash: result.transactionHash,
+    blockNumber: result.blockNumber,
+    gasUsed: result.gasUsed,
+    farmCount,
+    dailyRootCount: dailyRoots.length,
+  });
 }

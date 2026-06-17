@@ -91,15 +91,6 @@ export default function LandingPage() {
             Get your farm certified
           </Link>
         </div>
-
-        <div className="relative z-10 mt-20 flex items-center gap-4 flex-wrap justify-center">
-          {(["A+", "A", "B", "C"] as const).map((g) => (
-            <div key={g} className={`grade-${g === "A+" ? "aplus" : g.toLowerCase()} text-xl px-6 py-3 backdrop-blur-sm`}>
-              {g}
-            </div>
-          ))}
-        </div>
-        <p className="relative z-10 mt-3 text-xs text-foreground/50">Every product gets an honest grade</p>
       </section>
 
       {/* The problem */}

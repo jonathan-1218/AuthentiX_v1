@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/jonathanjeshua/AuthentiX_new/AuthentiX_v1/contracts/contracts/TruSoil.sol": {
-      "lastModificationDate": 1781377486368,
-      "contentHash": "61f58ff1a775e7c599bd4597963f3993",
+      "lastModificationDate": 1781499707633,
+      "contentHash": "5bfcb95d8d369a8527ef8e3beba08e72",
       "sourceName": "contracts/TruSoil.sol",
       "solcConfig": {
         "version": "0.8.24",
