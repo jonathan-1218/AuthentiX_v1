@@ -3,9 +3,12 @@ import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { writeAuditLog } from "@/lib/audit";
 import { ok, err } from "@/lib/api-response";
+import { batchIdSchema } from "@/lib/validators";
 import Batch from "@/models/Batch";
 
-const schema = z.object({ reason: z.string().min(1, "Rejection reason is required") });
+const schema = z.object({
+  reason: z.string().trim().min(1, "Rejection reason is required").max(500),
+}).strict();
 
 export async function POST(
   req: NextRequest,
@@ -13,6 +16,10 @@ export async function POST(
 ) {
   const userId = req.headers.get("x-user-id")!;
   const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+
+  // Validate batchId path param format
+  const idParsed = batchIdSchema.safeParse(params.batchId);
+  if (!idParsed.success) return err("Invalid batchId", 400);
 
   let body: unknown;
   try { body = await req.json(); } catch { return err("Invalid JSON", 400); }
@@ -22,7 +29,7 @@ export async function POST(
 
   await connectDB();
 
-  const batch = await Batch.findOne({ batchId: params.batchId });
+  const batch = await Batch.findOne({ batchId: idParsed.data });
   if (!batch) return err("Batch not found", 404);
 
   batch.approvalStatus = "rejected";

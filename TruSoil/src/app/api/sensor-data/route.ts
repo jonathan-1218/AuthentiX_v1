@@ -3,28 +3,39 @@ import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import { calculateComplianceScore } from "@/lib/certification";
 import { writeAuditLog } from "@/lib/audit";
+import { rateLimit, LIMITS, buildRateLimitKey } from "@/lib/rate-limit";
 import { ok, err } from "@/lib/api-response";
 import SensorData from "@/models/SensorData";
 import Batch from "@/models/Batch";
 
 const schema = z.object({
-  batchId: z.string().min(1),
-  farmId: z.string().min(1),
+  batchId:     z.string().min(1).max(50).regex(/^batch_[0-9a-f-]{36}$/),
+  farmId:      z.string().min(1).max(50).regex(/^farm_[0-9a-f-]{36}$/),
   temperature: z.number().min(-10).max(60),
-  humidity: z.number().min(0).max(100),
-  soilMoisture: z.number().min(0).max(100),
-  pH: z.number().min(0).max(14),
-  pesticide: z.number().min(0).max(100),
-  rain: z.number().min(0),
-  timestamp: z.string().datetime().optional(),
-});
+  humidity:    z.number().min(0).max(100),
+  soilMoisture:z.number().min(0).max(100),
+  pH:          z.number().min(0).max(14),
+  pesticide:   z.number().min(0).max(100),
+  rain:        z.number().min(0).max(1000),
+  // ISO 8601 datetime string, not too far in the past or future
+  timestamp:   z.string().datetime().optional(),
+}).strict();
 
 export async function POST(req: NextRequest) {
   const userId = req.headers.get("x-user-id")!;
-  const role = req.headers.get("x-user-role")!;
-  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  const role   = req.headers.get("x-user-role")!;
+  const ip     = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown";
 
   if (role !== "farmer" && role !== "admin") return err("Forbidden", 403);
+
+  // Rate limit by authenticated user to prevent data flooding (120 readings/hr per user)
+  const rlKey   = buildRateLimitKey("sensor", ip, userId);
+  const limit   = rateLimit(rlKey, LIMITS.SENSOR_DATA.max, LIMITS.SENSOR_DATA.windowMs);
+  if (!limit.allowed) {
+    const res = err("Sensor data submission rate limit exceeded. Try again later.", 429);
+    res.headers.set("Retry-After", String(limit.retryAfter));
+    return res;
+  }
 
   let body: unknown;
   try { body = await req.json(); } catch { return err("Invalid JSON", 400); }

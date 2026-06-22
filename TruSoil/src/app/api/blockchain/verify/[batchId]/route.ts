@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { ok, err } from "@/lib/api-response";
+import { rateLimit, LIMITS } from "@/lib/rate-limit";
 import { verifyMonthlyRoot } from "@/lib/blockchain";
 import { buildMonthlyMerkleRoot } from "@/lib/merkle";
 import DailyMerkleRoot from "@/models/DailyMerkleRoot";
@@ -11,6 +12,16 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { batchId: string } }
 ) {
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown";
+
+  // Public endpoint that makes an Infura RPC call — limit to prevent cost abuse
+  const limit = rateLimit(`verify:ip:${ip}`, LIMITS.VERIFY.max, LIMITS.VERIFY.windowMs);
+  if (!limit.allowed) {
+    const res = err("Rate limit exceeded", 429);
+    res.headers.set("Retry-After", String(limit.retryAfter));
+    return res;
+  }
+
   await connectDB();
 
   // Support both ?monthKey=YYYY-MM and the path param

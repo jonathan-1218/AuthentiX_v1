@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import { ok } from "@/lib/api-response";
+import { ok, err } from "@/lib/api-response";
+import { farmIdSchema } from "@/lib/validators";
 import SensorData from "@/models/SensorData";
 import { subDays, format } from "date-fns";
 
@@ -8,7 +9,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { farmId: string } }
 ) {
-  const { farmId } = params;
+  // Validate farmId format before touching the database
+  const idParsed = farmIdSchema.safeParse(params.farmId);
+  if (!idParsed.success) return err("Invalid farmId", 400);
+  const farmId = idParsed.data;
   const since = subDays(new Date(), 30);
 
   await connectDB();

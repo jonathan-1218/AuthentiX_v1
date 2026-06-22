@@ -1,19 +1,30 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
-import { ok } from "@/lib/api-response";
+import { ok, err } from "@/lib/api-response";
+import { parsePage } from "@/lib/validators";
 import Batch from "@/models/Batch";
 import Farm from "@/models/Farm";
 
 const PAGE_SIZE = 20;
 
+const querySchema = z.object({
+  status: z.enum(["active", "completed", "certified", "rejected"]).optional(),
+  grade:  z.enum(["A+", "A", "B", "C"]).optional(),
+  page:   z.string().optional(),
+}).strict();
+
 export async function GET(req: NextRequest) {
   const userId = req.headers.get("x-user-id")!;
-  const role = req.headers.get("x-user-role")!;
-  const url = new URL(req.url);
+  const role   = req.headers.get("x-user-role")!;
+  const url    = new URL(req.url);
 
-  const status = url.searchParams.get("status");
-  const grade = url.searchParams.get("grade");
-  const page = parseInt(url.searchParams.get("page") ?? "1");
+  const qParsed = querySchema.safeParse(Object.fromEntries(url.searchParams));
+  if (!qParsed.success) return err(qParsed.error.errors[0].message, 400);
+
+  const { status, grade } = qParsed.data;
+  const page = parsePage(url.searchParams.get("page"));
+  const skip = (page - 1) * PAGE_SIZE;
 
   await connectDB();
 
@@ -26,9 +37,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (status) filter.status = status;
-  if (grade) filter.overallGrade = grade;
+  if (grade)  filter.overallGrade = grade;
 
-  const skip = (page - 1) * PAGE_SIZE;
   const [batches, total] = await Promise.all([
     Batch.find(filter).sort({ createdAt: -1 }).skip(skip).limit(PAGE_SIZE).lean(),
     Batch.countDocuments(filter),
