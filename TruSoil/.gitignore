@@ -1,4 +1,18 @@
-node_modules
+# ── Dependencies ────────────────────────────────────────────
+node_modules/
+
+# ── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Next.js Build Output ─────────────────────────────────────
+.next/
+out/
+
+# ── OS / Editor ──────────────────────────────────────────────
 .DS_Store
-dist
 .vscode/*.log
+
+# ── Misc ─────────────────────────────────────────────────────
+*.tsbuildinfo

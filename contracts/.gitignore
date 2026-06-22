@@ -1,0 +1,16 @@
+# ── Dependencies ────────────────────────────────────────────
+node_modules/
+
+# ── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Deployment Records (contain wallet address & tx hashes) ──
+deployed_address.txt
+
+# ── Hardhat Artifacts (generated, not secrets — but large) ───
+artifacts/
+cache/
+typechain/
+typechain-types/

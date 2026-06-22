@@ -1,12 +1,39 @@
-# dependencies
+# ── Dependencies ────────────────────────────────────────────
 node_modules/
 **/node_modules/
 
-# env and secrets
+# ── Environment & Secrets ────────────────────────────────────
+# All .env variants — covers .env, .env.local, .env.production, etc.
 .env
 .env.*
-firebase-to-blockchain/firebaseKey.json
+!.env.example        # allow the example template to be committed
 
-# build output
+# Firebase service-account keys (JSON with private_key field)
+firebase-to-blockchain/firebaseKey.json
+**/serviceAccountKey.json
+**/*-firebase-adminsdk-*.json
+**/firebase-key.json
+**/firebase-credentials.json
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Hardhat / Ethereum
+contracts/deployed_address.txt   # contains deployer wallet address & tx hashes
+contracts/.env
+contracts/.env.*
+
+# ── Build Output ─────────────────────────────────────────────
 dist/
 build/
+.next/
+out/
+
+# ── OS / Editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/*.log
+.idea/
